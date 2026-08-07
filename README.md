@@ -1,4 +1,4 @@
-# AgentSec++
+# AgentSec: An Object-Oriented Explainable Security Agent Framework for Autonomous Cyber Defense
 
 An Object-Oriented, Explainable Security Agent Framework for Autonomous Cyber Defense.
 
