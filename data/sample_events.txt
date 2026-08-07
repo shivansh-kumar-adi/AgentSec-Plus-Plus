@@ -1,0 +1,7 @@
+# format: type,ip,severity,description,extra
+login_fail,192.168.1.10,4,Repeated login failures,3
+login_fail,192.168.1.10,6,Repeated login failures,7
+port_scan,10.0.0.5,5,Scanning common ports,15
+file_tamper,192.168.1.22,7,Config file modified,/etc/app/config.yaml
+malware,172.16.0.9,9,Known trojan signature match,TrojanX.Gen
+login_fail,203.0.113.4,3,Single failed login,1
