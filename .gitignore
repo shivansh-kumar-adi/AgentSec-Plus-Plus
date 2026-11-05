@@ -1,0 +1,16 @@
+.env
+*.db
+*.sqlite3
+*.log
+*.exe
+*.obj
+*.pdb
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+dist/
+build/
+.idea/
+.vscode/
+
