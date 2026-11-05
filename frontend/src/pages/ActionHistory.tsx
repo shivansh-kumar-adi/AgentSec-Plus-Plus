@@ -1,0 +1,11 @@
+import {useCallback, useState} from 'react'
+import {useOutletContext} from 'react-router-dom'
+import {AuthSession} from '../auth'
+import {ActionRecord, fetchActions} from '../api'
+import {Drawer, EmptyState, ErrorState, JsonDetails, LoadingState, PageHeader, RefreshButton, safeJson, StatusBadge} from '../components/common'
+import {useResource} from '../hooks/useResource'
+
+export function ActionHistoryPage() {
+  const {token} = useOutletContext<AuthSession>(); const [selected, setSelected] = useState<ActionRecord | null>(null); const loader = useCallback(() => fetchActions(token), [token]); const state = useResource(loader, 30_000); const history = (state.data ?? []).filter(action => action.status !== 'pending')
+  return <><PageHeader eyebrow="RESPONSE LEDGER" title="Action History" description="Completed, simulated, and approved response records from the backend." actions={<RefreshButton onClick={state.refresh} updatedAt={state.updatedAt}/>}/>{state.loading ? <LoadingState/> : state.error ? <ErrorState message={state.error} retry={state.refresh}/> : !history.length ? <EmptyState title="No action history" detail="No response action has progressed beyond pending status."/> : <section className="panel table-panel"><table><thead><tr><th>ID</th><th>Action</th><th>Status</th><th>Mode</th><th>Incident</th><th>Requester</th><th>Approved by</th><th>Requested</th></tr></thead><tbody>{history.map(action => <tr key={action.id} onClick={() => setSelected(action)}><td className="mono">{action.id}</td><td>{action.action_type.replaceAll('_', ' ')}</td><td><StatusBadge value={action.status}/></td><td>{action.simulation ? 'Simulation' : 'Endpoint action'}</td><td>#{action.incident_id}</td><td>User {action.requested_by}</td><td>{action.approved_by ? `User ${action.approved_by}` : '—'}</td><td>{new Date(action.requested_at).toLocaleString()}</td></tr>)}</tbody></table></section>}{selected && <Drawer title={`Action ${selected.id}`} onClose={() => setSelected(null)}><StatusBadge value={selected.status}/><dl className="definition-list"><div><dt>Target</dt><dd>{selected.target}</dd></div><div><dt>Simulation</dt><dd>{selected.simulation ? 'Yes — no endpoint modification' : 'No'}</dd></div><div><dt>Executed</dt><dd>{selected.executed_at ?? 'Not executed'}</dd></div></dl><h3>Result</h3><JsonDetails value={safeJson(selected.result_json)}/></Drawer>}</>
+}

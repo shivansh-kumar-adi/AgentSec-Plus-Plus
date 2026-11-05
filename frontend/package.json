@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test": "vitest run",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -13,12 +14,14 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "react-router-dom": "^7.18.5",
     "recharts": "latest",
     "typescript": "latest",
     "vite": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "vitest": "^5.1.0"
   }
 }
