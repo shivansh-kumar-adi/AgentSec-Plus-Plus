@@ -1,247 +1,314 @@
-# AgentSec++
+# AgentSec AI
 
-**An Object-Oriented, Explainable Security Agent Framework for Autonomous Cyber Defense**
+AgentSec AI is an endpoint-security monitoring and incident-response platform
+that combines a native Windows telemetry collector, authenticated event
+ingestion, persistent security records, deterministic investigations, controlled
+response approvals, and a React operations dashboard.
 
-AgentSec++ is a C++17 mini-project that simulates a rule-based autonomous
-security agent. It observes security events, evaluates them against a set
-of rules, computes a transparent confidence score for its decision, and
-executes an appropriate response — while explaining *why* it made that
-choice at every step.
+The project began as the AgentSec++ C++17 decision-engine exercise. The original
+engine is preserved under `security-engine/` and has been extended with a real
+Windows collector, Python event forwarding, a FastAPI control plane, SQLite
+persistence, and a responsive frontend.
 
-The project is built to demonstrate core Object-Oriented Programming
-concepts (inheritance, polymorphism, encapsulation, composition) alongside
-two classic software design patterns (Factory and Strategy), applied to a
-realistic autonomous-systems use case rather than a toy example.
+> **Verified scope:** the current investigation provider is deterministic
+> policy logic—not an LLM threat analyst. The only verified response execution
+> mode is simulation; it does not modify the operating system or send real
+> notifications.
 
----
+## Problem statement
 
-## Table of Contents
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Architecture](#architecture)
-- [The OODA Loop](#the-ooda-loop)
-- [Decision Confidence Score (DCS)](#decision-confidence-score-dcs)
-- [Design Patterns Used](#design-patterns-used)
-- [Project Structure](#project-structure)
-- [Building](#building)
-- [Running the Simulation](#running-the-simulation)
-- [Running the Tests](#running-the-tests)
-- [Sample Output](#sample-output)
-- [Extending the Project](#extending-the-project)
-- [Known Limitations](#known-limitations)
+Endpoint telemetry is useful only when it can be collected, authenticated,
+normalized, stored, investigated, and presented to an operator without allowing
+untrusted logs or automated recommendations to trigger unsafe host actions.
+AgentSec AI demonstrates that complete local workflow with explicit trust
+boundaries and auditable approvals.
 
----
+## Key features
 
-## Overview
+- C++17 Windows process and IPv4 TCP telemetry collection
+- JSON Lines output and Python forwarding client
+- One-time agent enrollment and per-agent signing key
+- HMAC-SHA256 request authentication over the exact event body
+- Five-minute timestamp window and database-backed nonce replay protection
+- Separate per-agent event rate limit of 600 events per 60 seconds
+- Password authentication, signed one-hour operator tokens, and RBAC
+- SQLite persistence in a Docker named volume
+- Severity/detection-driven incident creation
+- Deterministic evidence-based investigation and recommendations
+- Pending/approval/simulation response-action workflow
+- Persistent user and agent audit records
+- REST APIs, WebSocket live-event stream, and OpenAPI documentation
+- React/TypeScript dashboard with API-backed empty and populated states
 
-Traditional security systems often act as black boxes — an alert fires, an
-action happens, and the reasoning is opaque. AgentSec++ takes the opposite
-approach: every decision the agent makes is backed by an explicit,
-numerically-scored justification, following the classical **Observe →
-Orient → Decide → Act** (OODA) loop used in real autonomous systems and
-cybersecurity research.
+## Technology stack
 
-The agent is deliberately architected so its core decision logic (currently
-rule-based) can later be swapped for a machine-learned model, an LLM-backed
-reasoner, or a formally verifiable decision module — without changing the
-surrounding class structure. This makes it a reusable research/teaching
-platform, not just a one-off script.
-
-## Key Features
-
-- **Polymorphic event handling** — four distinct security event types
-  processed through a common interface
-- **Pluggable response actions** — block, notify, quarantine, or ignore,
-  selected dynamically at runtime
-- **Explainable decisions** — every action comes with a human-readable
-  reason and a numeric confidence score (0.0–1.0)
-- **Configurable caution levels** — Strict / Balanced / Relaxed strategies
-  change how aggressively the agent responds, without touching engine code
-- **Dual logging** — simultaneous human-readable text logs and
-  machine-readable JSON logs
-- **Unit-tested decision logic** — core behaviors verified with a
-  lightweight assertion-based test suite
+| Layer | Technology |
+|---|---|
+| Endpoint collector | C++17, Win32 Toolhelp, Windows IP Helper API |
+| Agent transport | Python 3 standard library, HMAC-SHA256 |
+| Backend | Python, FastAPI, Pydantic, Uvicorn |
+| Persistence | SQLite with foreign keys and WAL mode |
+| Frontend | React, TypeScript, Vite, Recharts, Lucide |
+| Runtime | Docker Desktop, Docker Compose, Nginx |
+| CI | GitHub Actions, CMake, pytest, npm |
 
 ## Architecture
 
-```
-SecurityEvent (abstract)
-├── LoginFailure       — tracks failed login attemptCount
-├── PortScan           — tracks portsScanned
-├── FileTampering      — tracks filePath
-└── MalwareAlert       — tracks malware signature
-
-Action (abstract)
-├── BlockIP
-├── Ignore
-├── NotifyAdmin
-└── QuarantineDevice
-
-Rule (abstract)
-├── LoginRule            → matches LoginFailure events
-├── PortScanRule         → matches PortScan events
-├── FileTamperingRule    → matches FileTampering events
-└── MalwareRule          → matches MalwareAlert events
-
-DecisionStrategy (abstract)
-├── StrictStrategy     — low thresholds, blocks more readily
-├── BalancedStrategy   — default, moderate caution
-└── RelaxedStrategy    — high thresholds, blocks less readily
-
-Logger (abstract)
-├── TextLogger   — appends human-readable lines to a .txt file
-└── JSONLogger   — writes a structured JSON array of decisions
-
-DecisionEngine   — evaluates rules against an event, computes DCS,
-                   selects an Action based on the active strategy
-SecurityAgent    — orchestrates the full OODA loop per event
-EventFactory     — centralizes event object creation from raw input
+```mermaid
+flowchart LR
+  subgraph Endpoint[Monitored Windows endpoint]
+    OS[Windows process and TCP APIs] --> CPP[C++ collector]
+    CPP -->|JSONL| UP[Python uploader]
+  end
+  UP -->|HMAC-signed HTTPS request| API[FastAPI backend]
+  API --> AUTH[Authentication and RBAC]
+  API --> DB[(SQLite persistent volume)]
+  API --> INV[Deterministic investigation policy]
+  API --> RESP[Approval and simulation workflow]
+  API -->|REST and WebSocket| UI[React SOC dashboard]
+  API --> AUDIT[Audit records]
 ```
 
-## The OODA Loop
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture,
+ingestion, investigation, response, audit, and deployment diagrams.
 
-Each event flows through the agent as follows:
+## End-to-end workflow
 
-```
-Observe   →  SecurityAgent.observe(event)         stores the incoming event
-Orient    →  event->display()                     surfaces event details
-Decide    →  DecisionEngine->decide(event)         evaluates rules, computes DCS,
-                                                     selects an Action
-Act       →  action->execute()                     performs the response
-Explain   →  explainDecision()                     prints the reason + confidence
-Record    →  Logger->log(...)                      persists the decision
-```
+1. `agentsec_collector` reads process and TCP tables and emits normalized JSONL.
+2. `integrations/agent_uploader.py` compacts each JSON object.
+3. The uploader hashes the exact body and signs timestamp, nonce, and hash.
+4. The backend authenticates the agent and rejects stale or replayed requests.
+5. A per-agent bucket enforces 600 event attempts per 60 seconds.
+6. Pydantic validates event type, severity, sizes, and unknown fields.
+7. Valid events and an audit record are committed to SQLite.
+8. Detection events or events with severity 7+ create an incident.
+9. An analyst/admin can create a deterministic investigation.
+10. An analyst/admin can request a response; an admin must approve it.
+11. Verified simulation records a result while making no OS change.
 
-## Decision Confidence Score (DCS)
+## Project structure
 
-Rather than a hard-coded if/else chain, every decision is backed by a
-weighted confidence score:
-
-```
-DCS = 0.35 × Severity
-    + 0.25 × RuleMatchStrength
-    + 0.20 × HistoricalFrequency
-    + 0.20 × SourceReputation
-```
-
-| Factor              | Weight | Meaning                                                    |
-|---------------------|--------|--------------------------------------------------------------|
-| Severity            | 0.35   | The event's own severity rating (0–10), normalized to 0–1   |
-| Rule Match Strength | 0.25   | How strongly the matched rule's condition was met            |
-| Historical Frequency| 0.20   | How often this source IP has triggered events this session   |
-| Source Reputation   | 0.20   | A per-IP trust score; defaults to 0.5 (neutral) if unknown    |
-
-The resulting score is compared against the active strategy's thresholds:
-
-| DCS Range        | Balanced Strategy Action |
-|-------------------|---------------------------|
-| ≥ 0.85            | Block / Quarantine        |
-| 0.60 – 0.85       | Notify Administrator      |
-| < 0.60            | Monitor / Ignore          |
-
-Thresholds shift depending on whether `StrictStrategy`, `BalancedStrategy`,
-or `RelaxedStrategy` is active.
-
-## Design Patterns Used
-
-**Factory Pattern** — `EventFactory::createEvent(...)` centralizes object
-creation from raw CSV input, so calling code never directly instantiates a
-concrete event type. Adding a new event type only requires a change in one
-place.
-
-**Strategy Pattern** — `DecisionEngine` holds a `DecisionStrategy*` and asks
-it for thresholds rather than hard-coding them. Swapping the active
-strategy changes the agent's overall caution level without modifying
-`DecisionEngine` itself.
-
-## Project Structure
-
-```
-agentsec-plus-plus/
-├── README.md
-├── .gitignore
-├── main.cpp                    simulation entry point
-├── include/                    class headers
-│   ├── SecurityEvent.h / LoginFailure.h / PortScan.h / ...
-│   ├── Action.h / BlockIP.h / Ignore.h / ...
-│   ├── Rule.h / LoginRule.h / FileTamperingRule.h / ...
-│   ├── DecisionStrategy.h
-│   ├── DecisionEngine.h
-│   ├── SecurityAgent.h
-│   ├── Logger.h
-│   └── EventFactory.h
-├── src/                        .cpp implementations
-│   ├── SecurityEvent.cpp
-│   └── DecisionEngine.cpp
-├── tests/
-│   └── test_engine.cpp         unit tests for decision logic
-├── data/
-│   └── sample_events.txt       sample simulation input
-└── docs/
-    ├── project-proposal.md
-    ├── architecture.md
-    └── commit-plan.md
+```text
+AgentSec-AI/
+├── backend/                 FastAPI application and tests
+├── frontend/                React/TypeScript dashboard
+├── security-engine/         Preserved engine and Windows collector
+├── integrations/            Signed Python event uploader
+├── docs/                    Architecture, API, security and verification
+├── .github/workflows/       CI definition
+├── docker-compose.yml
+├── .env.example
+└── CMakeLists.txt
 ```
 
-## Building
+## Configuration
 
-Requires a C++17-capable compiler (g++ 7+, clang, or MSVC).
+Copy `.env.example` to `.env` and replace the example secrets. Never commit the
+real `.env` file.
 
-```bash
-g++ -std=c++17 -Iinclude main.cpp src/SecurityEvent.cpp src/DecisionEngine.cpp -o agentsec
+```env
+AGENTSEC_ENV=development
+AGENTSEC_DATABASE_PATH=./agentsec.db
+AGENTSEC_SECRET_KEY=replace-with-at-least-32-random-bytes
+AGENTSEC_BOOTSTRAP_ADMIN=admin
+AGENTSEC_BOOTSTRAP_PASSWORD=replace-this-development-password
+AGENTSEC_CORS_ORIGINS=http://localhost:5173
+VITE_API_URL=http://localhost:8000
 ```
 
-On Windows, this produces `agentsec.exe`.
+`AGENTSEC_LLM_PROVIDER` and `AGENTSEC_LLM_API_KEY` exist in configuration, but
+the current investigation implementation does not call an LLM provider.
 
-## Running the Simulation
+## Docker deployment
 
-```bash
-./agentsec data/sample_events.txt      # Linux/Mac
-agentsec.exe data\sample_events.txt    # Windows
+```powershell
+Copy-Item .env.example .env
+# Edit .env and replace every example credential.
+docker compose config
+docker compose up --build -d
+docker compose ps
 ```
 
-Output is printed to the console and written to `agent_log.txt` (human-readable)
-and `agent_log.json` (structured).
+Local services:
 
-Input format (`data/sample_events.txt`), one event per line:
-```
-type,ip,severity,description,extra
-login_fail,192.168.1.10,6,Repeated login failures,7
-```
-Valid `type` values: `login_fail`, `port_scan`, `file_tamper`, `malware`.
+- Dashboard: <http://localhost:5173>
+- API: <http://localhost:8000>
+- Swagger UI: <http://localhost:8000/docs>
+- Health: <http://localhost:8000/health>
 
-## Running the Tests
+Expected health response:
 
-```bash
-g++ -std=c++17 -Iinclude tests/test_engine.cpp src/SecurityEvent.cpp src/DecisionEngine.cpp -o run_tests
-./run_tests
+```json
+{"status":"ok","database":"ok"}
 ```
 
-Expected output: `6/6 tests passed.`
+The Compose deployment stores `/data/agentsec.db` in the `agentsec-data` named
+volume. This is a single-node local deployment; PostgreSQL is not implemented.
 
-## Sample Output
+## Authentication and agent registration
 
+Authenticate an operator:
+
+```powershell
+$login = Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/auth/login `
+  -ContentType application/json `
+  -Body (@{username="admin";password="<configured-password>"}|ConvertTo-Json)
+$headers = @{Authorization="Bearer $($login.access_token)"}
 ```
-[MalwareAlert] Signature: TrojanX.Gen | Severity: 9
-[ACTION] Quarantining device: 172.16.0.9
-  -> Explanation: Rule=MalwareRule DCS=0.705 Strategy=Balanced | Confidence: 0.705
+
+Register an agent (admin only):
+
+```powershell
+$agent = Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/agents `
+  -Headers $headers -ContentType application/json `
+  -Body (@{name="windows-lab";platform="windows"}|ConvertTo-Json)
 ```
 
-## Extending the Project
+The enrollment response contains a one-time `signing_key`. Store it securely;
+do not place it in source code, frontend configuration, screenshots, or logs.
 
-- Add a new event type: create a class extending `SecurityEvent`, register
-  it in `EventFactory`
-- Add a new response: create a class extending `Action`
-- Add a new detection rule: create a class extending `Rule`, register it
-  with `DecisionEngine::addRule()` in `main.cpp`
-- Tune the DCS weights or thresholds: edit `DecisionEngine::computeDCS()`
-  or the relevant `DecisionStrategy` subclass
+## Windows collector
 
-## Known Limitations
+Build with CMake and Visual Studio Build Tools:
 
-- Historical frequency and source reputation are in-memory only and reset
-  each run (no persistence layer)
-- Severity is supplied directly in the input data rather than derived from
-  raw signal analysis
-- This is a research/educational simulation — it does not integrate with
-  any real firewall, IDS, or live network traffic
+```powershell
+cmake -S security-engine -B security-engine/build
+cmake --build security-engine/build --config Release
+security-engine\build\Release\agentsec_collector.exe --once
+```
+
+Or run an already-built local executable:
+
+```powershell
+security-engine\agentsec_collector.exe --once
+```
+
+Continuous collection uses a minimum five-second interval:
+
+```powershell
+security-engine\agentsec_collector.exe --interval 30
+```
+
+Forward a single snapshot:
+
+```powershell
+python integrations\agent_uploader.py `
+  --collector security-engine\agentsec_collector.exe `
+  --backend http://localhost:8000 `
+  --agent-id <agent-uuid> `
+  --signing-key <one-time-signing-key> `
+  --once
+```
+
+The collector requires no documented administrator privilege for process
+snapshots or `GetTcpTable2`; visibility may still be restricted by endpoint
+policy. Collection failures are written to stderr.
+
+## API summary
+
+| Method | Route | Purpose |
+|---|---|---|
+| GET | `/health` | Backend/database health |
+| POST | `/api/v1/auth/login` | Authenticate operator |
+| POST | `/api/v1/agents` | Register agent (admin) |
+| POST | `/api/v1/events` | Signed agent event ingestion |
+| GET | `/api/v1/events` | Retrieve events |
+| GET | `/api/v1/incidents` | List incidents |
+| POST | `/api/v1/investigations` | Create investigation |
+| POST | `/api/v1/actions` | Request response action |
+| GET | `/api/v1/actions` | List response actions |
+| POST | `/api/v1/actions/{action_id}/approve` | Approve action (admin) |
+| GET | `/api/v1/audit` | Retrieve audit history (admin) |
+| WS | `/ws/events?token=...` | Live event notifications |
+
+There is no registered `GET /api/v1/agents`, incident-detail route, or
+investigation-listing route. Full schemas are in
+[docs/API_REFERENCE.md](docs/API_REFERENCE.md).
+
+## Investigation engine
+
+The verified provider is `deterministic-policy`. It queries events linked to an
+incident, takes the maximum event severity, and classifies evidence as one of:
+
+- `confirmed_malicious`
+- `suspicious_unconfirmed`
+- `benign`
+- `insufficient_evidence`
+
+Only structured `attributes.confirmed_indicator=true` can produce the confirmed
+classification. Free-form descriptions remain untrusted evidence.
+
+## Response workflow
+
+Supported request types are `block_ip`, `terminate_process`, `quarantine_file`,
+`disable_account`, and `notify`. Requests enter `pending`; only administrators
+can approve them. The verified test used `notify` with `simulation=true` and
+returned:
+
+```json
+{"executed":true,"mode":"simulation","message":"No operating-system change was made."}
+```
+
+No real notification was sent and no OS state was changed.
+
+## Testing
+
+```powershell
+# Backend
+Set-Location backend
+python -m pytest -q
+
+# Frontend
+Set-Location ..\frontend
+npm ci
+npm run build
+
+# C++
+Set-Location ..
+cmake -S . -B build
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
+
+See [docs/TESTING_AND_VERIFICATION.md](docs/TESTING_AND_VERIFICATION.md) for
+verified evidence, unexecuted tests, and limitations.
+
+## Security considerations
+
+- Treat event descriptions, paths, usernames, addresses, and attributes as
+  untrusted input.
+- Rotate server and agent secrets after suspected disclosure.
+- Terminate TLS at a trusted reverse proxy before remote deployment.
+- Do not expose SQLite or Docker volumes over the network.
+- Keep destructive response adapters disabled until separately designed,
+  reviewed, and sandbox-tested.
+- Session tokens currently use browser session storage; a same-site HttpOnly
+  cookie/BFF design is preferable for an Internet-facing deployment.
+
+See [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md).
+
+## Limitations and future work
+
+- Deterministic investigation only; no verified LLM analysis
+- SQLite-only single-node persistence
+- No verified automatic incident generation from newly collected network events
+- No destructive response execution; simulation only
+- No production-scale load or adversarial testing
+- Additional Windows telemetry and RBAC boundary validation pending
+- Dedicated replay-negative and container-restart persistence tests pending
+- No Linux collector in the current source tree
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the completion matrix.
+
+## Screenshots
+
+Actual screenshots were not included in the verified source package. Suggested
+future captures: login, overview, live events, incident list, investigation
+result, response approval, and audit history.
+
+## Author
+
+**Shivansh Kumar**  
+Portfolio: <https://shivanshonline.in>  
+GitHub: <https://github.com/shivansh07adi-cloud>
+
