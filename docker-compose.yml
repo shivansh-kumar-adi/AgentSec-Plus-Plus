@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      AGENTSEC_ENV: ${AGENTSEC_ENV:-development}
+      AGENTSEC_SECRET_KEY: ${AGENTSEC_SECRET_KEY:?set AGENTSEC_SECRET_KEY}
+      AGENTSEC_BOOTSTRAP_ADMIN: ${AGENTSEC_BOOTSTRAP_ADMIN:-admin}
+      AGENTSEC_BOOTSTRAP_PASSWORD: ${AGENTSEC_BOOTSTRAP_PASSWORD:?set AGENTSEC_BOOTSTRAP_PASSWORD}
+      AGENTSEC_CORS_ORIGINS: ${AGENTSEC_CORS_ORIGINS:-http://localhost:5173}
+    volumes:
+      - agentsec-data:/data
+    ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports: ["5173:80"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  agentsec-data:
+
