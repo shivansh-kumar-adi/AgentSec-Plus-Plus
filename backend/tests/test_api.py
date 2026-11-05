@@ -10,7 +10,10 @@ os.environ["AGENTSEC_SECRET_KEY"] = "test-secret-key-with-at-least-32-bytes"
 os.environ["AGENTSEC_BOOTSTRAP_PASSWORD"] = "correct-horse-battery-staple"
 
 from fastapi.testclient import TestClient
-from app.main import app
+try:
+    from app.main import app
+except ModuleNotFoundError:
+    from backend.app.main import app
 
 
 def test_health_auth_ingestion_and_investigation(tmp_path):
@@ -43,4 +46,3 @@ def test_health_auth_ingestion_and_investigation(tmp_path):
         investigation = client.post("/api/v1/investigations", headers=headers, json={"incident_id": incident_id})
         assert investigation.status_code == 201
         assert investigation.json()["classification"] == "suspicious_unconfirmed"
-
