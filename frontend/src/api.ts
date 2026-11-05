@@ -1,4 +1,16 @@
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim()
+
+export const API_CONFIGURATION_ERROR = !configuredApiBaseUrl && !import.meta.env.DEV
+  ? 'Frontend configuration error: VITE_API_BASE_URL is required in production.'
+  : null
+
+export const API_BASE_URL = (configuredApiBaseUrl || (import.meta.env.DEV ? 'http://localhost:8000' : ''))
+  .replace(/\/+$/, '')
+
+function apiUrl(path: string): string {
+  if (API_CONFIGURATION_ERROR) throw new Error(API_CONFIGURATION_ERROR)
+  return `${API_BASE_URL}${path}`
+}
 
 export type EventRecord = {
   id: number; agent_id: string; event_type: string; occurred_at: string;
@@ -14,7 +26,7 @@ export type ActionRecord = {
 }
 
 export async function login(username: string, password: string) {
-  const response = await fetch(`${API_URL}/api/v1/auth/login`, {
+  const response = await fetch(apiUrl('/api/v1/auth/login'), {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({username, password}),
   })
@@ -23,7 +35,7 @@ export async function login(username: string, password: string) {
 }
 
 export async function api<T>(path: string, token: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...options,
     headers: {'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...options?.headers},
   })

@@ -3,7 +3,7 @@ import { Activity, Bot, CheckCircle2, ClipboardCheck, FileClock, Gauge, KeyRound
   LayoutDashboard, ListFilter, Network, Plug, Radio, Search, Settings, ShieldAlert,
   Siren, TerminalSquare, Users, XCircle } from 'lucide-react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { ActionRecord, api, EventRecord, Incident, login } from './api'
+import { ActionRecord, api, API_CONFIGURATION_ERROR, EventRecord, Incident, login } from './api'
 
 const pages = [
   ['Overview', LayoutDashboard], ['Live monitoring', Radio], ['Threat detection', ShieldAlert],
@@ -56,6 +56,7 @@ export function App() {
     sessionStorage.setItem('agentsec_role', nextRole); setToken(value); setIdentity(user); setRole(nextRole)
   }
   useEffect(() => {
+    if (API_CONFIGURATION_ERROR) return
     if (!token) return
     Promise.all([api<EventRecord[]>('/api/v1/events?limit=250', token), api<Incident[]>('/api/v1/incidents', token), api<ActionRecord[]>('/api/v1/actions', token)])
       .then(([nextEvents, nextIncidents, nextActions]) => {setEvents(nextEvents); setIncidents(nextIncidents); setActions(nextActions)})
@@ -66,6 +67,14 @@ export function App() {
     events.forEach(item => { const key = new Date(item.occurred_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); points.set(key, (points.get(key) ?? 0) + 1) })
     return [...points].reverse().slice(-16).map(([time, count]) => ({time, count}))
   }, [events])
+  if (API_CONFIGURATION_ERROR) return <main className="login-shell">
+    <section className="login-brand"><div className="brand-mark"><Activity /></div><span>AGENTSEC / AI</span>
+      <h1>Configuration required.</h1><p>The dashboard cannot connect until its production API origin is configured.</p>
+    </section>
+    <section className="login-card"><div><small>DEPLOYMENT ERROR</small><h2>API unavailable</h2></div>
+      <div className="form-error"><XCircle size={16}/>{API_CONFIGURATION_ERROR}</div>
+    </section>
+  </main>
   if (!token) return <Login onAuthenticated={authenticate}/>
   const critical = incidents.filter(item => item.severity >= 9 && item.status === 'open').length
   const open = incidents.filter(item => item.status === 'open').length

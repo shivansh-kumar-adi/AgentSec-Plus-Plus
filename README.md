@@ -113,7 +113,7 @@ AGENTSEC_SECRET_KEY=replace-with-at-least-32-random-bytes
 AGENTSEC_BOOTSTRAP_ADMIN=admin
 AGENTSEC_BOOTSTRAP_PASSWORD=replace-this-development-password
 AGENTSEC_CORS_ORIGINS=http://localhost:5173
-VITE_API_URL=http://localhost:8000
+VITE_API_BASE_URL=https://agentsec-ai-backend-p08y.onrender.com
 ```
 
 `AGENTSEC_LLM_PROVIDER` and `AGENTSEC_LLM_API_KEY` exist in configuration, but
