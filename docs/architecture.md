@@ -18,7 +18,7 @@ flowchart TB
     API --> APPROVAL[Response approval workflow]
     API --> STREAM[WebSocket broadcaster]
   end
-  API --> DB[(SQLite/WAL in Docker volume)]
+  API --> DB[(SQLite local or PostgreSQL production)]
   API --> AUDIT[(Audit records)]
   STREAM --> UI[React SOC dashboard]
   UI -->|Bearer-authenticated REST| API
@@ -34,7 +34,7 @@ flowchart TB
 | Agent registration | Admin-only issuance of UUID and one-time signing material. Only `POST /api/v1/agents` exists. |
 | C++ collector | Uses Toolhelp process snapshots and `GetTcpTable2`; emits normalized JSONL. |
 | Python uploader | Runs the collector, compacts JSON and signs/sends each event independently. |
-| SQLite | Stores users, agents, nonces, events, incidents, investigations, actions and audit records. |
+| SQLite/PostgreSQL | Stores users, agents, nonces, events, incidents, investigations, actions and audit records. |
 | Investigation policy | Deterministically classifies linked evidence and generates bounded recommendations. |
 | Response workflow | Records requests and admin approvals; verified execution is simulation only. |
 
@@ -46,7 +46,7 @@ sequenceDiagram
   participant C as C++ collector
   participant U as Python uploader
   participant B as FastAPI backend
-  participant D as SQLite
+  participant D as configured database
   participant S as WebSocket clients
   W->>C: Process and IPv4 TCP snapshots
   C-->>U: One JSON event per line
@@ -99,7 +99,7 @@ severity 7, `suspicious_unconfirmed`, and provider `deterministic-policy`.
 sequenceDiagram
   participant R as Analyst/Admin
   participant B as Backend
-  participant D as SQLite
+  participant D as configured database
   participant A as Administrator
   R->>B: POST /api/v1/actions
   B->>B: Validate action type, target and incident

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Settings:
     environment: str = os.getenv("AGENTSEC_ENV", "development")
+    database_url: str | None = os.getenv("DATABASE_URL") or None
     database_path: str = os.getenv("AGENTSEC_DATABASE_PATH", "agentsec.db")
     secret_key: str = os.getenv("AGENTSEC_SECRET_KEY", "development-only-change-me-32-bytes")
     bootstrap_admin: str = os.getenv("AGENTSEC_BOOTSTRAP_ADMIN", "admin")
@@ -23,8 +24,10 @@ class Settings:
         if self.environment == "production":
             if len(self.secret_key) < 32 or "change" in self.secret_key.lower():
                 raise RuntimeError("AGENTSEC_SECRET_KEY must be a strong production secret")
-            if "change" in self.bootstrap_password.lower():
-                raise RuntimeError("Bootstrap password must be changed in production")
+            if len(self.bootstrap_password) < 12 or "change" in self.bootstrap_password.lower():
+                raise RuntimeError("Bootstrap password must be strong and changed in production")
+            if not self.bootstrap_admin.strip():
+                raise RuntimeError("AGENTSEC_BOOTSTRAP_ADMIN must not be empty")
 
 
 settings = Settings()

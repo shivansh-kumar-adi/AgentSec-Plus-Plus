@@ -14,7 +14,8 @@
 | Signed event ingestion | Implemented, tested | HMAC uploader events persisted |
 | Timestamp/nonce replay protection | Implemented, unverified negatively | Dedicated replay test pending |
 | Per-agent rate limiting | Implemented, tested operationally | 600 events/60 s; earlier 429 issue addressed |
-| SQLite persistence | Implemented, tested in running deployment | Restart persistence pending |
+| SQLite persistence | Implemented, API flow tested | Restart persistence pending |
+| PostgreSQL persistence | Implemented, unverified against a live server | Run `tests/test_postgresql.py` with a dedicated test database |
 | Incident creation | Implemented, partially tested | Incident 1 verified; new network-event generation unverified |
 | Deterministic investigation | Implemented, tested | Investigation 3, incident 1, event 1 |
 | LLM investigation | Not implemented | Configuration fields only |
@@ -23,7 +24,7 @@
 | Audit logging | Implemented, tested | IDs 736–743 verified |
 | WebSocket streaming | Implemented, unverified | Dedicated client test pending |
 | Docker deployment | Implemented, tested | Containers/health/frontend verified |
-| PostgreSQL/migrations | Not implemented | SQLite schema initialization only |
+| PostgreSQL/migrations | Implemented, not live-server verified | Versioned startup schema supports SQLite and PostgreSQL |
 | Linux collector | Not implemented | No Linux source in current tree |
 
 ## Near-term engineering priorities

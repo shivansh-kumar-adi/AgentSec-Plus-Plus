@@ -183,7 +183,7 @@ async def ingest_event(request: Request, x_agent_id: str = Header(), x_agent_tim
     now = utc_now()
     with connection() as db:
         try:
-            cursor = db.execute(
+            event_db_id = db.insert_id(
                 "INSERT INTO security_events(agent_id,event_id,event_type,occurred_at,severity,source_ip,process_id,username,description,attributes_json,received_at) "
                 "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (x_agent_id, event.event_id, event.event_type, event.occurred_at.isoformat(), event.severity,
@@ -192,14 +192,12 @@ async def ingest_event(request: Request, x_agent_id: str = Header(), x_agent_tim
             )
         except Exception as exc:
             raise HTTPException(409, "duplicate event") from exc
-        event_db_id = cursor.lastrowid
         incident_id = None
         if event.severity >= 7 or event.event_type == "detection":
             title = f"{event.event_type.replace('_', ' ').title()} on agent {x_agent_id[:8]}"
-            cursor = db.execute("INSERT INTO incidents(title,status,severity,category,summary,created_at,updated_at) "
-                                "VALUES(?,?,?,?,?,?,?)", (title, "open", event.severity, event.event_type,
-                                event.description, now, now))
-            incident_id = cursor.lastrowid
+            incident_id = db.insert_id("INSERT INTO incidents(title,status,severity,category,summary,created_at,updated_at) "
+                                       "VALUES(?,?,?,?,?,?,?)", (title, "open", event.severity, event.event_type,
+                                       event.description, now, now))
             db.execute("INSERT INTO incident_events(incident_id,event_id) VALUES(?,?)", (incident_id, event_db_id))
         db.execute("UPDATE agents SET last_seen_at=? WHERE id=?", (now, x_agent_id))
         audit(db, "agent", x_agent_id, "ingest", "security_event", str(event_db_id),
@@ -245,13 +243,13 @@ def create_investigation(payload: InvestigationRequest,
                           "WHERE ie.incident_id=? ORDER BY e.occurred_at DESC LIMIT 100",
                           (payload.incident_id,)).fetchall()
         result = investigate([dict(row) for row in rows])
-        cursor = db.execute("INSERT INTO investigations(incident_id,classification,severity,evidence_json,explanation,recommendations_json,provider,created_at) "
-                            "VALUES(?,?,?,?,?,?,?,?)", (payload.incident_id, result["classification"],
-                            result["severity"], json.dumps(result["evidence"]), result["explanation"],
-                            json.dumps(result["recommendations"]), result["provider"], utc_now()))
+        investigation_id = db.insert_id("INSERT INTO investigations(incident_id,classification,severity,evidence_json,explanation,recommendations_json,provider,created_at) "
+                                         "VALUES(?,?,?,?,?,?,?,?)", (payload.incident_id, result["classification"],
+                                         result["severity"], json.dumps(result["evidence"]), result["explanation"],
+                                         json.dumps(result["recommendations"]), result["provider"], utc_now()))
         audit(db, "user", str(user["id"]), "investigate", "incident", str(payload.incident_id),
-              {"investigation_id": cursor.lastrowid})
-    return {"id": cursor.lastrowid, "incident_id": payload.incident_id, **result}
+              {"investigation_id": investigation_id})
+    return {"id": investigation_id, "incident_id": payload.incident_id, **result}
 
 
 @app.post("/api/v1/actions", status_code=201)
@@ -262,12 +260,12 @@ def request_action(payload: ActionRequest, user=Depends(require_role("admin", "a
     with connection() as db:
         if not db.execute("SELECT id FROM incidents WHERE id=?", (payload.incident_id,)).fetchone():
             raise HTTPException(404, "incident not found")
-        cursor = db.execute("INSERT INTO response_actions(incident_id,action_type,target,parameters_json,status,simulation,requested_by,requested_at) "
-                            "VALUES(?,?,?,?,?,?,?,?)", (payload.incident_id, payload.action_type, payload.target,
-                            json.dumps(payload.parameters), "pending", int(payload.simulation), user["id"], now))
-        audit(db, "user", str(user["id"]), "request", "response_action", str(cursor.lastrowid),
+        action_id = db.insert_id("INSERT INTO response_actions(incident_id,action_type,target,parameters_json,status,simulation,requested_by,requested_at) "
+                                 "VALUES(?,?,?,?,?,?,?,?)", (payload.incident_id, payload.action_type, payload.target,
+                                 json.dumps(payload.parameters), "pending", int(payload.simulation), user["id"], now))
+        audit(db, "user", str(user["id"]), "request", "response_action", str(action_id),
               {"simulation": payload.simulation})
-    return {"id": cursor.lastrowid, "status": "pending", "simulation": payload.simulation}
+    return {"id": action_id, "status": "pending", "simulation": payload.simulation}
 
 
 @app.post("/api/v1/actions/{action_id}/approve")

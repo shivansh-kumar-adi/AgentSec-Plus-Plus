@@ -5,7 +5,7 @@
 - Operator credentials and access tokens
 - Agent enrollment material and signing keys
 - Endpoint telemetry and incident evidence
-- SQLite database and Docker volume
+- SQLite local database/Docker volume or production PostgreSQL database
 - Response approval and audit history
 
 ## Identities and authorization
@@ -86,7 +86,7 @@ session cookies through a backend-for-frontend design.
 ## Known security gaps
 
 - No TLS termination in Compose
-- SQLite file and named-volume access rely on host/Docker controls
+- SQLite file/named-volume and PostgreSQL access rely on host and database controls
 - No distributed rate-limit store
 - No token revocation list or refresh-token flow
 - No agent-key rotation/revocation endpoint

@@ -7,8 +7,8 @@ response approvals, and a React operations dashboard.
 
 The project began as the AgentSec++ C++17 decision-engine exercise. The original
 engine is preserved under `security-engine/` and has been extended with a real
-Windows collector, Python event forwarding, a FastAPI control plane, SQLite
-persistence, and a responsive frontend.
+Windows collector, Python event forwarding, a FastAPI control plane, dual
+SQLite/PostgreSQL persistence, and a responsive frontend.
 
 > **Verified scope:** the current investigation provider is deterministic
 > policy logic—not an LLM threat analyst. The only verified response execution
@@ -32,7 +32,7 @@ boundaries and auditable approvals.
 - Five-minute timestamp window and database-backed nonce replay protection
 - Separate per-agent event rate limit of 600 events per 60 seconds
 - Password authentication, signed one-hour operator tokens, and RBAC
-- SQLite persistence in a Docker named volume
+- SQLite persistence for local development and PostgreSQL support for production
 - Severity/detection-driven incident creation
 - Deterministic evidence-based investigation and recommendations
 - Pending/approval/simulation response-action workflow
@@ -47,7 +47,7 @@ boundaries and auditable approvals.
 | Endpoint collector | C++17, Win32 Toolhelp, Windows IP Helper API |
 | Agent transport | Python 3 standard library, HMAC-SHA256 |
 | Backend | Python, FastAPI, Pydantic, Uvicorn |
-| Persistence | SQLite with foreign keys and WAL mode |
+| Persistence | SQLite (local/CI) or PostgreSQL via Psycopg 3 (production) |
 | Frontend | React, TypeScript, Vite, Recharts, Lucide |
 | Runtime | Docker Desktop, Docker Compose, Nginx |
 | CI | GitHub Actions, CMake, pytest, npm |
@@ -62,7 +62,7 @@ flowchart LR
   end
   UP -->|HMAC-signed HTTPS request| API[FastAPI backend]
   API --> AUTH[Authentication and RBAC]
-  API --> DB[(SQLite persistent volume)]
+  API --> DB[(SQLite or PostgreSQL)]
   API --> INV[Deterministic investigation policy]
   API --> RESP[Approval and simulation workflow]
   API -->|REST and WebSocket| UI[React SOC dashboard]
@@ -80,7 +80,7 @@ ingestion, investigation, response, audit, and deployment diagrams.
 4. The backend authenticates the agent and rejects stale or replayed requests.
 5. A per-agent bucket enforces 600 event attempts per 60 seconds.
 6. Pydantic validates event type, severity, sizes, and unknown fields.
-7. Valid events and an audit record are committed to SQLite.
+7. Valid events and an audit record are committed to the configured database.
 8. Detection events or events with severity 7+ create an incident.
 9. An analyst/admin can create a deterministic investigation.
 10. An analyst/admin can request a response; an admin must approve it.
@@ -142,8 +142,9 @@ Expected health response:
 {"status":"ok","database":"ok"}
 ```
 
-The Compose deployment stores `/data/agentsec.db` in the `agentsec-data` named
-volume. This is a single-node local deployment; PostgreSQL is not implemented.
+The default Compose deployment stores `/data/agentsec.db` in the `agentsec-data`
+named volume. Set `DATABASE_URL` to use PostgreSQL for production; see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Supabase and Render configuration.
 
 ## Authentication and agent registration
 
@@ -279,7 +280,7 @@ verified evidence, unexecuted tests, and limitations.
   untrusted input.
 - Rotate server and agent secrets after suspected disclosure.
 - Terminate TLS at a trusted reverse proxy before remote deployment.
-- Do not expose SQLite or Docker volumes over the network.
+- Do not expose SQLite, PostgreSQL, or Docker volumes directly to the Internet.
 - Keep destructive response adapters disabled until separately designed,
   reviewed, and sandbox-tested.
 - Session tokens currently use browser session storage; a same-site HttpOnly
@@ -290,7 +291,7 @@ See [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md).
 ## Limitations and future work
 
 - Deterministic investigation only; no verified LLM analysis
-- SQLite-only single-node persistence
+- PostgreSQL integration tests require a dedicated external PostgreSQL test database
 - No verified automatic incident generation from newly collected network events
 - No destructive response execution; simulation only
 - No production-scale load or adversarial testing
