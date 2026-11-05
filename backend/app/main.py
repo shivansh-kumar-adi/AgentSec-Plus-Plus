@@ -37,9 +37,6 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="AgentSec AI API", version="0.1.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_credentials=False,
-                   allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type",
-                   "X-Agent-Id", "X-Agent-Timestamp", "X-Agent-Nonce", "X-Agent-Signature"])
 
 
 @app.middleware("http")
@@ -66,6 +63,20 @@ async def security_headers_and_rate_limit(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
+
+
+# Register CORS after the custom HTTP middleware so it is the outer application
+# middleware and can attach headers to preflight, authentication, and rate-limit responses.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(settings.cors_origins),
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization", "Content-Type", "X-Agent-Id", "X-Agent-Timestamp",
+        "X-Agent-Nonce", "X-Agent-Signature",
+    ],
+)
 
 
 def current_user(authorization: str = Header(default="")) -> dict[str, Any]:

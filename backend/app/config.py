@@ -2,6 +2,24 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(dotenv_path=PROJECT_ROOT / ".env", override=False)
+
+PRODUCTION_FRONTEND_ORIGIN = "https://agentsec-ai.vercel.app"
+LOCAL_FRONTEND_ORIGIN = "http://localhost:5173"
+
+
+def _cors_origins() -> tuple[str, ...]:
+    configured = (
+        item.strip()
+        for item in os.getenv("AGENTSEC_CORS_ORIGINS", LOCAL_FRONTEND_ORIGIN).split(",")
+    )
+    return tuple(dict.fromkeys((*filter(None, configured), LOCAL_FRONTEND_ORIGIN, PRODUCTION_FRONTEND_ORIGIN)))
 
 
 @dataclass(frozen=True)
@@ -12,11 +30,7 @@ class Settings:
     secret_key: str = os.getenv("AGENTSEC_SECRET_KEY", "development-only-change-me-32-bytes")
     bootstrap_admin: str = os.getenv("AGENTSEC_BOOTSTRAP_ADMIN", "admin")
     bootstrap_password: str = os.getenv("AGENTSEC_BOOTSTRAP_PASSWORD", "change-me-in-production")
-    cors_origins: tuple[str, ...] = tuple(
-        item.strip()
-        for item in os.getenv("AGENTSEC_CORS_ORIGINS", "http://localhost:5173").split(",")
-        if item.strip()
-    )
+    cors_origins: tuple[str, ...] = _cors_origins()
     llm_provider: str = os.getenv("AGENTSEC_LLM_PROVIDER", "disabled")
     llm_api_key: str = os.getenv("AGENTSEC_LLM_API_KEY", "")
 
